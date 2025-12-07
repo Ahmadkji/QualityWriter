@@ -61,9 +61,9 @@ export class MoonshotClient {
 
   async createChatCompletion(
     request: MoonshotCompletionRequest,
-    options: { retries?: number; retryDelay?: number } = {}
+    options: { retries?: number; retryDelay?: number; timeout?: number } = {}
   ): Promise<MoonshotCompletionResponse> {
-    const { retries = 3, retryDelay = 1000 } = options;
+    const { retries = 2, retryDelay = 1000, timeout = 45000 } = options; // Reduced retries, added timeout
     let lastError: Error;
 
     console.log('📤 Moonshot API request:', {
@@ -71,7 +71,7 @@ export class MoonshotClient {
       messageCount: request.messages.length,
       temperature: request.temperature,
       maxTokens: request.max_tokens,
-      attempt: 1,
+      timeout: timeout,
       maxRetries: retries + 1
     });
 
@@ -79,13 +79,22 @@ export class MoonshotClient {
       try {
         console.log(`🚀 Making API request (attempt ${attempt + 1}/${retries + 1})...`);
         
-        const response = await this.client.chat.completions.create({
+        // Create timeout promise
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(`Request timeout after ${timeout}ms`)), timeout);
+        });
+
+        // Create API request promise
+        const apiPromise = this.client.chat.completions.create({
           model: request.model,
           messages: request.messages,
           temperature: request.temperature,
           max_tokens: request.max_tokens,
           stream: false,
         });
+
+        // Race between API request and timeout
+        const response = await Promise.race([apiPromise, timeoutPromise]);
 
         console.log('✅ Moonshot API response received:', {
           id: response.id,
@@ -103,26 +112,54 @@ export class MoonshotClient {
         lastError = error as Error;
         
         const errorObj = error as any;
+        const errorMessage = errorObj.message || 'Unknown error';
+        const isTimeout = errorMessage.includes('timeout');
+        const isRateLimit = errorObj.response?.status === 429;
+        
         console.error(`❌ Moonshot API error (attempt ${attempt + 1}):`, {
-          message: errorObj.message || 'Unknown error',
+          message: errorMessage,
           status: errorObj.response?.status,
           statusText: errorObj.response?.statusText,
-          code: errorObj.code
+          code: errorObj.code,
+          isTimeout,
+          isRateLimit
         });
         
         if (errorObj.response?.data) {
           console.error('API Error Details:', errorObj.response.data);
         }
         
-        if (attempt < retries) {
-          const delayTime = retryDelay * Math.pow(2, attempt);
-          console.warn(`⏳ Retrying in ${delayTime}ms...`);
-          await this.delay(delayTime); // Exponential backoff
+        // Don't retry on certain errors
+        const shouldNotRetry = 
+          errorObj.response?.status === 401 || // Unauthorized
+          errorObj.response?.status === 403 || // Forbidden
+          errorObj.response?.status === 404 || // Not found
+          errorMessage.includes('Invalid API key') ||
+          errorMessage.includes('quota');
+        
+        if (shouldNotRetry || attempt >= retries) {
+          break;
         }
+        
+        // Calculate retry delay with exponential backoff
+        let delayTime = retryDelay * Math.pow(2, attempt);
+        
+        // Add jitter for rate limiting
+        if (isRateLimit) {
+          delayTime = delayTime + Math.random() * 1000;
+        }
+        
+        console.warn(`⏳ Retrying in ${Math.round(delayTime)}ms...`);
+        await this.delay(delayTime);
       }
     }
 
-    throw lastError!;
+    // Enhance error message for better debugging
+    const enhancedError = new Error(
+      `Moonshot API failed after ${retries + 1} attempts: ${lastError!.message}`
+    );
+    enhancedError.stack = lastError!.stack;
+    throw enhancedError;
   }
 
   async createStreamingChatCompletion(

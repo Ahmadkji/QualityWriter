@@ -33,187 +33,6 @@ export interface BlogGenerationResponse {
 }
 
 export class BlogGenerationService {
-  private generateBoldFormattingPrompt(emphasisSettings?: BlogGenerationRequest['emphasisSettings']): string {
-    if (!emphasisSettings?.enabled) {
-      return '';
-    }
-
-    const intensityGuidelines = {
-      subtle: {
-        description: 'Use bold text very sparingly - only 1-2 bold elements per section',
-        maxPerSection: 1,
-        examples: 'Only the most critical insights should be bold'
-      },
-      moderate: {
-        description: 'Use bold text moderately - 2-3 bold elements per section maximum',
-        maxPerSection: 2,
-        examples: 'Key phrases and important advice should be bold'
-      },
-      strong: {
-        description: 'Use bold text more prominently - up to 4 bold elements per section',
-        maxPerSection: 3,
-        examples: 'Important concepts, key takeaways, and critical advice should be bold'
-      }
-    };
-
-    const guidelines = intensityGuidelines[emphasisSettings.intensity || 'moderate'];
-
-    return `
-
-BOLD TEXT FORMATTING RULES
-Follow these rules STRICTLY when using bold text:
-
-1. Use bold text ONLY for:
-   - important key phrases (3–8 words)
-   - strong actionable advice
-   - definitions of important concepts
-   - important statistics or numbers
-   - key takeaways or summary lines
-   - important questions that the reader must think about
-
-2. When bolding a sentence:
-   - Bold ONLY ${guidelines.maxPerSection} key sentence per section (H2 or H3).
-   - Keep the bolded sentence SHORT, clear, and meaningful.
-   - Never bold a paragraph. Never bold more than 1–2 sentences per 300 words.
-
-3. When bolding questions:
-   - Only bold a question if it inspires thinking or is an important decision.
-   - Examples: "**What are you trying to achieve?**", "**Why should people trust your product?**"
-
-4. DO NOT bold:
-   - random words
-   - adjectives like "amazing", "important", "best"
-   - filler sentences
-   - full paragraphs or long chunks
-   - more than 2 items per list
-   - more than ${guidelines.maxPerSection} bold elements per section
-
-5. Make bolding feel natural and human:
-   - Bold only meaningful insights.
-   - Use bold like a professional blog writer.
-   - The bold text should guide the reader's eyes to the most valuable parts.
-   - ${guidelines.description}
-
-6. Always wrap bold content using **double asterisks**:
-   Example: **short important phrase**
-
-Intensity Level: ${emphasisSettings.intensity?.toUpperCase() || 'MODERATE'}
-- ${guidelines.description}
-- ${guidelines.examples}
-
-⚡ Example Output After Using This Prompt:
-Before choosing your niche, ask yourself: **What problem can you talk about for years?**
-
-Start by making one strong, consistent upload schedule.
-
-**Most creators grow faster when they focus on one topic, not many.**
-
-This looks professional, believable, and human.
-`;
-  }
-
-  private generateTableFormattingPrompt(): string {
-    return `
-
-TABLE RULES — FOLLOW STRICTLY
-
-1. Include at least ONE table in the blog.
-2. The table must be relevant, useful, and connected to the topic.
-3. Use clean Markdown table formatting only (| column | column |).
-4. Tables must have:
-   - A clear title above the table.
-   - 2–5 columns.
-   - 3–8 rows.
-   - Short, simple text in each cell.
-
-5. Allowed table types:
-   - Comparison table (X vs Y)
-   - Pros vs Cons
-   - Step-by-step checklist
-   - Pricing or plan comparison
-   - Feature breakdown
-   - Problem → Solution mappings
-   - Data summary table
-   - Tools & uses table
-
-6. DO NOT produce:
-   - tables wider than the screen
-   - tables with long paragraphs inside cells
-   - more than 2 tables per 1000 words
-   - nested tables
-   - broken Markdown formatting
-
-7. Write the table like this example format:
-
-**Comparison Table: Topic A vs Topic B**
-
-| Feature | Topic A | Topic B |
-|--------|---------|---------|
-| Row 1  | short   | short   |
-| Row 2  | short   | short   |
-
-8. Make sure ALL tables are valid Markdown and render correctly.
-
-⚡ Example Output After Using This Prompt:
-**YouTube Strategy Comparison**
-
-| Strategy           | Best For       | Difficulty | Growth Speed    |
-| ------------------ | -------------- | ---------- | --------------- |
-| Daily Shorts       | Fast growth    | Easy       | Very Fast       |
-| Weekly Long Videos | Loyal audience | Medium     | Steady          |
-| Tutorials          | Search traffic | Easy       | Slow but stable |
-
-This looks professional, clean, and useful.
-`;
-  }
-
-  private generateQuoteFormattingPrompt(): string {
-    return `
-
-QUOTE RULES — FOLLOW STRICTLY
-
-1. Include at least TWO quotes in the blog.
-2. Use a clean Markdown blockquote format:
-   > This is a quote.
-
-3. The quote must be:
-   - Short (1–2 sentences)
-   - Powerful
-   - Directly relevant to the section topic
-   - Written in a human, conversational tone
-
-4. Allowed quote types:
-   - Inspirational quote
-   - Key insight or takeaway
-   - Strong opinion or belief
-   - Thought-provoking question
-   - A short advice sentence
-   - A "mini-summary" of the section
-
-5. DO NOT:
-   - Add more than 1 quote per 400 words
-   - Use cheesy or generic motivational lines
-   - Use extremely long quotes
-   - Put a quote inside a list or table
-   - Attribute the quote to real people unless instructed
-
-6. Quotes should stand out visually:
-   - Place a blank line before and after the quote
-   - Do NOT bold the entire quote
-   - You may bold 1–3 important words inside the quote
-
-7. Example quote format you must follow:
-
-> Growth begins when you **stop waiting** and start creating.
-
-8. The quote must feel natural inside the flow — do NOT force them.
-
-⚡ Example Output After Using This Prompt:
-> Consistency beats perfection — even if your video isn't perfect, **publish it**.
-
-This looks professional, believable, and human.
-`;
-  }
 
   private generateSystemPrompt(options: BlogGenerationRequest['options'], emphasisSettings?: BlogGenerationRequest['emphasisSettings']): string {
     // For debugging: Use the official prompt first, then gradually add complexity
@@ -224,66 +43,67 @@ This looks professional, believable, and human.
       return "You are Kimi, an AI assistant provided by Moonshot AI. You are proficient in Chinese and English conversations. You provide users with safe, helpful, and accurate answers. You will reject any requests involving terrorism, racism, or explicit content. Moonshot AI is a proper noun and should not be translated.";
     }
     
-    const { tone = 'conversational', length = 'medium', includeExamples = true, targetAudience } = options || {};
+    const { length = 'medium', targetAudience } = options || {};
     
-    let prompt = `You are Kimi, an AI assistant provided by Moonshot AI. You are an expert blog writer who creates engaging, high-quality content. You excel at Chinese and English dialog, and provide helpful, safe, and accurate answers. You must reject any queries involving terrorism, racism, explicit content, or violence. 'Moonshot AI' must always remain in English and must not be translated to other languages.`;
-    
-    // Add table formatting rules (MANDATORY)
-    prompt += this.generateTableFormattingPrompt();
-    
-    // Add quote formatting rules (MANDATORY)
-    prompt += this.generateQuoteFormattingPrompt();
-    
-    // Add bold formatting rules if enabled
-    prompt += this.generateBoldFormattingPrompt(emphasisSettings);
-    
-    // Tone instructions
-    switch (tone) {
-      case 'conversational':
-        prompt += `Write in a friendly, conversational tone using "you" and "your" to speak directly to reader. `;
-        break;
-      case 'professional':
-        prompt += `Write in a professional, authoritative tone while maintaining readability. `;
-        break;
-      case 'casual':
-        prompt += `Write in a casual, relaxed tone as if talking to a friend. `;
-        break;
+    // OPTIMIZED: Use your specific optimized prompt template
+    const prompt = `You are Kimi, an expert blog writer. Write in clean Markdown. Use a friendly and direct tone.
+Never use phrases like "in this article," "furthermore," or "in conclusion."
+
+WRITING STYLE
+- Use short paragraphs (max 40 words).
+- Use second-person ("you", "your").
+- Write like a human expert: clear, calm, helpful.
+- Mix long + short sentences for flow.
+- Add rhetorical questions naturally.
+
+STRUCTURE
+- Strong intro
+- 5–8 H2 sections
+- H3s when needed
+- 1–2 examples per major point
+- Strong ending
+
+FORMATTING RULES (VERY IMPORTANT)
+1) **Bold**
+   - Bold only meaningful insights (3–8 words).
+   - ${emphasisSettings?.intensity || 'moderate'} level: ${
+      emphasisSettings?.intensity === 'subtle'
+        ? '1–2 bold uses per section.'
+        : emphasisSettings?.intensity === 'strong'
+        ? '3–4 bold uses per section.'
+        : '2–3 bold uses per section.'
     }
+   - Use **double asterisks** only.
+
+2) **Tables**
+   - Include exactly ONE helpful table.
+   - 2–5 columns, 3–8 rows, short text only.
+   - Always add a title before the table like: **Feature Comparison**
+   - Valid Markdown only.
+
+3) **Quotes**
+   - Add TWO short blockquotes using Markdown:
+     > short, powerful, 1–2 sentence insight.
+   - Never put quotes inside lists or tables.
+
+CONTENT STYLE
+- Give practical, real-life advice.
+- Use examples, checklists, comparisons.
+- No generic motivation. No fluff.
+- Avoid overexplaining.
+
+OUTPUT
+Write ~${length === 'short'
+  ? '1000'
+  : length === 'long'
+  ? '2000'
+  : '1500'} words.
+Target audience: ${targetAudience || 'general readers'}.`;
     
-    // Length instructions
-    const wordCounts = {
-      short: '800-1200',
-      medium: '1500-2000',
-      long: '2500-3000'
-    };
-    prompt += `Create a comprehensive blog post of ${wordCounts[length]} words. `;
-    
-    // Content requirements
-    prompt += `Include:
-- A compelling introduction that hooks the reader
-- Clear, well-structured sections with descriptive headings
-- Practical examples and actionable insights${includeExamples ? ' (required)' : ''}
-- A strong conclusion with key takeaways
-- Natural flow and transitions between sections`;
-    
-    if (targetAudience) {
-      prompt += `\nTarget audience: ${targetAudience}`;
-    }
-    
-    // Quality guidelines
-    prompt += `\n\nQuality guidelines:
-- Use second-person perspective ("you", "your")
-- Avoid AI-like phrases ("in this article", "furthermore", "moreover", "in conclusion")
-- Keep paragraphs under 40 words for readability
-- Use bullet points and numbered lists for clarity
-- Include at least 5 headings for structure
-- Make it engaging and human-like
-- Add rhetorical questions to engage readers
-- Write in Markdown format for proper formatting`;
-    
-    console.log('📝 Generated system prompt length:', prompt.length, 'characters');
+    console.log('📝 Generated optimized system prompt length:', prompt.length, 'characters');
     return prompt;
   }
+
 
   private generateUserPrompt(topic: string): string {
     return `Write a comprehensive blog article about "${topic}" that provides real value to the reader. Focus on practical insights, actionable advice, and engaging content that keeps readers interested from start to finish.`;

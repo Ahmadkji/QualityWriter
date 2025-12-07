@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { blogGenerationService, BlogGenerationRequest } from '../../../lib/blogGenerationService';
+import { blogGenerationServiceFixed, BlogGenerationRequest, BlogGenerationResponse } from '../../../lib/blogGenerationService-fixed';
 import { validateContentQuality, calculateQualityScore } from '../../../lib/contentValidation';
 import { convertMarkdownToHTML, validateHTMLHeadings } from '../../../lib/markdownConverter';
 import sanitizeHtml from 'sanitize-html';
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
 
     if (isStreaming) {
       try {
-        const stream = await blogGenerationService.generateStreamingBlog(generationRequest);
+        const stream = await blogGenerationServiceFixed.generateStreamingBlog(generationRequest);
         
         return new Response(stream, {
           headers: {
@@ -173,54 +173,104 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
-      // Non-streaming generation
-      const result = await blogGenerationService.generateBlog(generationRequest);
+      // Non-streaming generation - use AI service with proper error handling
+      console.log('🚀 Starting AI-powered blog generation for title:', prompt);
+      
+      try {
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('AI service timeout')), 60000); // 60 second timeout
+        });
 
-      // Sanitize HTML
-      const sanitizedContent = sanitizeHtml(result.content, {
-        allowedTags: [
-          'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'strong', 'em', 'b', 'i',
-          'ul', 'ol', 'li',
-          'table', 'thead', 'tbody', 'tr', 'th', 'td',
-          'blockquote',
-          'br', 'hr'
-        ],
-        allowedAttributes: {
-          'th': ['class'],
-          'td': ['class'],
-          'table': ['class']
-        },
-        allowedClasses: {
-          'th': ['border', 'border-gray-300', 'px-4', 'py-3', 'text-left', 'font-semibold', 'text-gray-900'],
-          'td': ['border', 'border-gray-300', 'px-4', 'py-3', 'text-gray-700'],
-          'table': ['w-full', 'border-collapse', 'border', 'border-gray-300'],
-          'blockquote': ['border-l-4', 'border-blue-500', 'pl-4', 'py-2', 'my-4', 'bg-blue-50', 'italic', 'text-gray-700'],
-          'p': ['mb-4'],
-          'h1': ['text-2xl', 'font-bold', 'mb-4', 'mt-6'],
-          'h2': ['text-xl', 'font-semibold', 'mb-3', 'mt-5'],
-          'h3': ['text-lg', 'font-medium', 'mb-2', 'mt-4'],
-          'h4': ['text-base', 'font-medium', 'mb-2', 'mt-3'],
-          'ul': ['list-disc', 'mb-4', 'ml-6'],
-          'ol': ['list-decimal', 'mb-4', 'ml-6'],
-          'li': ['ml-4', 'mb-1']
-        },
-        disallowedTagsMode: 'discard',
-        allowVulnerableTags: false,
-        enforceHtmlBoundary: true
-      });
+        // Generate blog using the AI service
+        const aiPromise = blogGenerationServiceFixed.generateBlog(generationRequest);
+        
+        // Race between AI generation and timeout
+        const result = await Promise.race([aiPromise, timeoutPromise]) as BlogGenerationResponse;
+        
+        console.log('✅ AI service completed successfully');
+        console.log('🔍 Raw content length:', result.content.length);
+        console.log('🔍 Raw content preview:', result.content.substring(0, 200));
 
-      // Validate content quality
-      const qualityIssues = validateContentQuality(sanitizedContent);
-      const finalQualityScore = calculateQualityScore(sanitizedContent);
+        // Additional content validation and refinement
+        let finalContent = validateAndRefineContent(result.content);
+        
+        console.log('🔍 Refined content length:', finalContent.length);
+        console.log('🔍 Refined content preview:', finalContent.substring(0, 200));
 
-      return NextResponse.json({
-        content: sanitizedContent,
-        metadata: result.metadata,
-        qualityScore: finalQualityScore,
-        qualityIssues,
-        processingTime: Date.now() - startTime,
-      });
+        // Validate content quality
+        const qualityIssues = validateContentQuality(finalContent);
+        const finalQualityScore = calculateQualityScore(finalContent);
+
+        const responseData = {
+          content: finalContent,
+          metadata: {
+            ...result.metadata,
+            qualityScore: finalQualityScore,
+          },
+          qualityIssues,
+          processingTime: Date.now() - startTime,
+        };
+
+        console.log('✅ Blog generation completed successfully');
+        console.log('🔍 Final content length:', responseData.content.length);
+        console.log('🔍 Processing time:', responseData.processingTime, 'ms');
+
+        return NextResponse.json(responseData);
+        
+      } catch (error) {
+        console.error('❌ AI service failed:', error);
+        
+        // Fallback to a simple template if AI fails
+        const fallbackContent = `<h1 class="text-2xl font-bold mb-4 mt-6">Blog About: ${prompt}</h1><p class="mb-4">We encountered an issue generating content with our AI service. Please try again in a moment.</p><p class="mb-4">Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>`;
+        
+        const sanitizedFallback = sanitizeHtml(fallbackContent, {
+          allowedTags: [
+            'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+            'strong', 'em', 'b', 'i',
+            'ul', 'ol', 'li',
+            'table', 'thead', 'tbody', 'tr', 'th', 'td',
+            'blockquote',
+            'br', 'hr'
+          ],
+          allowedAttributes: {
+            'th': ['class'],
+            'td': ['class'],
+            'table': ['class']
+          },
+          allowedClasses: {
+            'th': ['border', 'border-gray-300', 'px-4', 'py-3', 'text-left', 'font-semibold', 'text-gray-900'],
+            'td': ['border', 'border-gray-300', 'px-4', 'py-3', 'text-gray-700'],
+            'table': ['w-full', 'border-collapse', 'border', 'border-gray-300'],
+            'blockquote': ['border-l-4', 'border-blue-500', 'pl-4', 'py-2', 'my-4', 'bg-blue-50', 'italic', 'text-gray-700'],
+            'p': ['mb-4'],
+            'h1': ['text-2xl', 'font-bold', 'mb-4', 'mt-6'],
+            'h2': ['text-xl', 'font-semibold', 'mb-3', 'mt-5'],
+            'h3': ['text-lg', 'font-medium', 'mb-2', 'mt-4'],
+            'h4': ['text-base', 'font-medium', 'mb-2', 'mt-3'],
+            'ul': ['list-disc', 'mb-4', 'ml-6'],
+            'ol': ['list-decimal', 'mb-4', 'ml-6'],
+            'li': ['ml-4', 'mb-1']
+          },
+          disallowedTagsMode: 'discard',
+          allowVulnerableTags: false,
+          enforceHtmlBoundary: true
+        });
+
+        const responseData = {
+          content: sanitizedFallback,
+          metadata: {
+            model: 'fallback',
+            tokensUsed: 0,
+            processingTime: Date.now() - startTime,
+            qualityScore: 50,
+          },
+          qualityIssues: ['AI service failed, used fallback content'],
+          processingTime: Date.now() - startTime,
+        };
+
+        return NextResponse.json(responseData);
+      }
     }
   } catch (error) {
     console.error('Blog generation error:', error);

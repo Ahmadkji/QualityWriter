@@ -6,10 +6,9 @@ import { Sparkles } from 'lucide-react';
 
 interface HeaderProps {
  showStartButton?: boolean;
- onStartWriting?: () => void;
 }
 
-export default function Header({ showStartButton = true, onStartWriting }: HeaderProps) {
+export default function Header({ showStartButton = true }: HeaderProps) {
   return (
     <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -33,13 +32,13 @@ export default function Header({ showStartButton = true, onStartWriting }: Heade
           >
             Pricing
           </Link>
-          {showStartButton && onStartWriting && (
-            <button
-              onClick={onStartWriting}
+          {showStartButton && (
+            <Link
+              href="/editor"
               className="px-6 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors"
             >
               Start Writing
-            </button>
+            </Link>
           )}
         </div>
       </div>
